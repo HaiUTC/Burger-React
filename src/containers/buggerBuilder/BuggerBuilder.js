@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import { connect } from 'react-redux'
 import axios from '../../axios-orders';
 import Bugger from '../../componets/Bugger/Bugger';
 import BuildControls from '../../componets/Bugger/BuildControls/BuildControls';
@@ -6,37 +7,19 @@ import OrderSummary from '../../componets/Bugger/OrderSummary/OrderSummary';
 import Modal from '../../componets/UI/Modal/Modal';
 import Spinner from '../../componets/UI/Spinner/Spinner';
 import Aux from '../../hoc/Auxx/Auxx';
-const INGREDIENT_PRICES = {
-    salad: 0.5,
-    cheese: 0.4,
-    meat: 1.4,
-    bacon: 2.0
-}
+import withErrorHandler from '../../hoc/withErrorHandler/withErrorHandler';
+import * as actions from '../../store/actions/index'
+
 
 class BuggerBuilder extends Component {
-    // constructor(props) {
-    //     super(props);
-    //     this.state = {}
-    // }
     state = {
-        ingredients: null,
-        totalPrice: 4,
-        purchaseable: false,
         purchasing: false,
-        loading: false,
-        error : false
     }
 
     componentDidMount() {
-        axios.get('https://my-app-ec6b3-default-rtdb.firebaseio.com/ingredients.json')
-            .then(response => {
-                this.setState({ ingredients: response.data })
-            })
-            .catch(error => {
-                this.setState({error : true})
-            })
+        this.props.onInitIngredient()
     }
-
+    
     updatePurchaseState(ingredients) {
 
         const sum = Object.keys(ingredients).map(igKey => {
@@ -46,44 +29,7 @@ class BuggerBuilder extends Component {
                 return sum + el
             }, 0)
 
-        this.setState({
-            purchaseable: sum > 0
-        })
-    }
-
-    addingIngredientHandler = (type) => {
-        const oldCount = this.state.ingredients[type]
-        const updatedCount = oldCount + 1
-        const updatedIngredients = {
-            ...this.state.ingredients
-        }
-        updatedIngredients[type] = updatedCount
-        const priceAddition = INGREDIENT_PRICES[type]
-        const oldPrices = this.state.totalPrice
-        const newPrices = oldPrices + priceAddition
-        this.setState({
-            totalPrice: newPrices,
-            ingredients: updatedIngredients
-        })
-        this.updatePurchaseState(updatedIngredients)
-
-    }
-    removeIngredientHandler = (type) => {
-        const oldCount = this.state.ingredients[type]
-        if (oldCount <= 0) return
-        const removeCount = oldCount - 1
-        const removeIngredients = {
-            ...this.state.ingredients
-        }
-        removeIngredients[type] = removeCount
-        const priceRemoving = INGREDIENT_PRICES[type]
-        const oldPrices = this.state.totalPrice
-        const newPrices = oldPrices - priceRemoving
-        this.setState({
-            totalPrice: newPrices,
-            ingredients: removeIngredients
-        })
-        this.updatePurchaseState(removeIngredients)
+        return sum>0
     }
 
     purchaseHandler = () => {
@@ -99,52 +45,39 @@ class BuggerBuilder extends Component {
     }
 
     purchaseContinueHandler = () => {
-        // alert('Continue')
-       
-        const queryParams = []
-        for(let i in this.state.ingredients){
-            queryParams.push(encodeURIComponent(i) + '=' + encodeURIComponent(this.state.ingredients[i]))
-        }
-        queryParams.push('price='+ this.state.totalPrice)
-        const queryString = queryParams.join('&')
-        this.props.history.push({
-            pathname : '/check-out',
-            search : '?' + queryString
-        })
+        this.props.onInitPurchase()
+        this.props.history.push('/check-out')
 
     }
 
     render() {
         const disableInfo = {
-            ...this.state.ingredients
+            ...this.props.ings
         }
         for (let key in disableInfo) {
             disableInfo[key] = disableInfo[key] <= 0
         }
 
         let orderSummary = null
-        let bugger = this.state.error ? <p>Ingredients can't be loaded.</p> :<Spinner />
-        if (this.state.ingredients) {
+        let bugger = this.props.error ? <p>Ingredients can't be loaded.</p> :<Spinner />
+        if (this.props.ings) {
             bugger = (
                 <Aux>
-                    <Bugger ingredients={this.state.ingredients} />
+                    <Bugger ingredients={this.props.ings} />
                     <BuildControls
-                        ingredientAdded={this.addingIngredientHandler}
-                        ingredientRemove={this.removeIngredientHandler}
+                        ingredientAdded={this.props.onIngredientAdded}
+                        ingredientRemove={this.props.onIngredientRemoved}
                         disabled={disableInfo}
-                        purchaseable={this.state.purchaseable}
+                        purchaseable={this.updatePurchaseState(this.props.ings)}
                         ordered={this.purchaseHandler}
-                        price={this.state.totalPrice} />
+                        price={this.props.price} />
                 </Aux>
             )
             orderSummary = <OrderSummary
-                ingredients={this.state.ingredients}
+                ingredients={this.props.ings}
                 purchaseContinue={this.purchaseContinueHandler}
                 purchaseCancel={this.purchaseCancelHandler}
-                price={this.state.totalPrice} />
-        }
-        if (this.state.loading) {
-            orderSummary = <Spinner />
+                price={this.props.price} />
         }
 
         return (
@@ -160,4 +93,21 @@ class BuggerBuilder extends Component {
     }
 }
 
-export default BuggerBuilder
+const mapStateToProps = (state) =>{
+    return {
+        ings : state.buggerBuilder.ingredients,
+        price : state.buggerBuilder.totalPrice,
+        error : state.error
+    }
+}
+
+const mapDispathToProps = (dispatch) =>{
+    return {
+        onIngredientAdded : (ingName) => dispatch(actions.addIngredient(ingName)),
+        onIngredientRemoved : (ingName) => dispatch(actions.removeIngredient(ingName)),
+        onInitIngredient : () => dispatch(actions.initIngredient()),
+        onInitPurchase : () => dispatch(actions.purchaseInit())
+    }
+}
+
+export default connect(mapStateToProps,mapDispathToProps)(withErrorHandler(BuggerBuilder,axios))

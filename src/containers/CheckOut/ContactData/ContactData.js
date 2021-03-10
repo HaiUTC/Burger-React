@@ -1,9 +1,12 @@
 import React, { Component } from 'react';
+import { connect }  from 'react-redux'
 import Button from '../../../componets/UI/Button/Button';
 import Spinner from '../../../componets/UI/Spinner/Spinner'
 import axios from '../../../axios-orders';
 import './ContactData.css'
 import Input from '../../../componets/UI/Input/Input';
+import * as actions from '../../../store/actions/index'
+import withErrorHander  from '../../../hoc/withErrorHandler/withErrorHandler'
 class ContactData extends Component {
     state = {
         orderForm: {
@@ -94,30 +97,20 @@ class ContactData extends Component {
 
             }
         },
-        formIsValid : false,
-        loading: false
+        formIsValid : false
     }
     orderHandler = (event) => {
         event.preventDefault()
-        // console.log(this.props.ingredients)
-        this.setState({ loading: true })
         const formData = {}
         for(let formEle in this.state.orderForm.customer){
             formData[formEle] = this.state.orderForm.customer[formEle].value
         }
         const order = {
-            ingredients: this.props.ingredients,
+            ingredients: this.props.ings,
             price: this.props.price,
             orderData : formData
         }
-        axios.post('/orders.json', order)
-            .then(resposive => {
-                this.setState({ loading: false })
-                this.props.history.push('/')
-            })
-            .catch(err => {
-                this.setState({ loading: false })
-            })
+        this.props.onOrderBugger(order)
     }
 
     checkValidity (value , rules){
@@ -185,7 +178,7 @@ class ContactData extends Component {
                     disabled={!this.state.formIsValid}>ORDER</Button>
             </form>
         )
-        if (this.state.loading) form = <Spinner />
+        if (this.props.loading) form = <Spinner />
         return (
             <div className='ContactData'>
                 <h4>Enter yor Contact Data</h4>
@@ -195,4 +188,20 @@ class ContactData extends Component {
     }
 }
 
-export default ContactData;
+const mapStateToProps = (state) =>{
+    return {
+        ings : state.buggerBuilder.ingredients,
+        price : state.buggerBuilder.totalPrice,
+        loading : state.order.loading
+    }
+}
+
+const mapDispatchToProps = dispatch =>{
+    return {
+        onOrderBugger : (orderData) =>{dispatch(actions.purchaseBugger(orderData))}
+    }
+}
+
+
+
+export default connect(mapStateToProps,mapDispatchToProps)(withErrorHander(ContactData,axios));
