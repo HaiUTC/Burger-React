@@ -29,16 +29,15 @@ export const purchaseInit = () =>{
     }
 }
 
-export const purchaseBugger = (orderData) =>{
+export const purchaseBugger = (orderData,token) =>{
     return dispatch =>{
         dispatch(purchaseBuggerStart())
-        axios.post('/order.json',orderData)
+        axios.post('/order.json?auth=' + token,orderData)
         .then(res=>{
             console.log(res.data)
             dispatch(purchaseBuggerSuccess(res.data,orderData))
         })
         .catch(err=>{
-            console.log('hala')
             dispatch(purchaseBuggerFail(err))
         })
     }
@@ -65,10 +64,11 @@ export const fetchOrderStart = () =>{
     }
 }
 
-export const fetchOrder = () =>{
+export const fetchOrder = (token,userId) =>{
     return dispatch =>{
         dispatch(fetchOrderStart())
-        axios.get('/order.json')
+        const queryString = '?auth=' + token + '&orderBy="userId"&equalTo="' + userId + '"'
+        axios.get('/order.json'+ queryString)
         .then(res =>{
             const fetchOrders = []
             for(let key in res.data){

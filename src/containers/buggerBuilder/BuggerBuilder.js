@@ -1,5 +1,5 @@
-import React, { Component } from 'react';
-import { connect } from 'react-redux'
+import React, { Component, useEffect, useState } from 'react';
+import { connect } from 'react-redux';
 import axios from '../../axios-orders';
 import Bugger from '../../componets/Bugger/Bugger';
 import BuildControls from '../../componets/Bugger/BuildControls/BuildControls';
@@ -8,19 +8,17 @@ import Modal from '../../componets/UI/Modal/Modal';
 import Spinner from '../../componets/UI/Spinner/Spinner';
 import Aux from '../../hoc/Auxx/Auxx';
 import withErrorHandler from '../../hoc/withErrorHandler/withErrorHandler';
-import * as actions from '../../store/actions/index'
+import * as actions from '../../store/actions/index';
 
 
-class BuggerBuilder extends Component {
-    state = {
-        purchasing: false,
-    }
+const buggerBuilder = props => {
+    const [purchasing, setPurchasing] = useState(false)
 
-    componentDidMount() {
-        this.props.onInitIngredient()
-    }
-    
-    updatePurchaseState(ingredients) {
+    useEffect(() => {
+        props.onInitIngredient()
+    }, [])
+
+    const updatePurchaseState = (ingredients) => {
 
         const sum = Object.keys(ingredients).map(igKey => {
             return ingredients[igKey]
@@ -29,85 +27,90 @@ class BuggerBuilder extends Component {
                 return sum + el
             }, 0)
 
-        return sum>0
+        return sum > 0
     }
 
-    purchaseHandler = () => {
-        this.setState({
-            purchasing: true
-        })
-    }
-
-    purchaseCancelHandler = () => {
-        this.setState({
-            purchasing: false
-        })
-    }
-
-    purchaseContinueHandler = () => {
-        this.props.onInitPurchase()
-        this.props.history.push('/check-out')
-
-    }
-
-    render() {
-        const disableInfo = {
-            ...this.props.ings
+    const purchaseHandler = () => {
+        if (props.isAuthenticated) {
+            setPurchasing(true)
         }
-        for (let key in disableInfo) {
-            disableInfo[key] = disableInfo[key] <= 0
+        else {
+            props.onSetRedirectPath('/check-out')
+            props.history.push('/auth')
         }
+    }
 
-        let orderSummary = null
-        let bugger = this.props.error ? <p>Ingredients can't be loaded.</p> :<Spinner />
-        if (this.props.ings) {
-            bugger = (
-                <Aux>
-                    <Bugger ingredients={this.props.ings} />
-                    <BuildControls
-                        ingredientAdded={this.props.onIngredientAdded}
-                        ingredientRemove={this.props.onIngredientRemoved}
-                        disabled={disableInfo}
-                        purchaseable={this.updatePurchaseState(this.props.ings)}
-                        ordered={this.purchaseHandler}
-                        price={this.props.price} />
-                </Aux>
-            )
-            orderSummary = <OrderSummary
-                ingredients={this.props.ings}
-                purchaseContinue={this.purchaseContinueHandler}
-                purchaseCancel={this.purchaseCancelHandler}
-                price={this.props.price} />
-        }
+    const purchaseCancelHandler = () => {
+        setPurchasing(false)
+    }
 
-        return (
+    const purchaseContinueHandler = () => {
+        props.onInitPurchase()
+        props.history.push('/check-out')
+
+    }
+
+    const disableInfo = {
+        ...props.ings
+    }
+    for (let key in disableInfo) {
+        disableInfo[key] = disableInfo[key] <= 0
+    }
+
+    let orderSummary = null
+    let bugger = props.error ? <p>Ingredients can't be loaded.</p> : <Spinner />
+    if (props.ings) {
+        bugger = (
             <Aux>
-                <Modal
-                    show={this.state.purchasing}
-                    modalClosed={this.purchaseCancelHandler}>
-                    {orderSummary}
-                </Modal>
-                {bugger}
+                <Bugger ingredients={props.ings} />
+                <BuildControls
+                    ingredientAdded={props.onIngredientAdded}
+                    ingredientRemove={props.onIngredientRemoved}
+                    disabled={disableInfo}
+                    purchaseable={updatePurchaseState(props.ings)}
+                    ordered={purchaseHandler}
+                    price={props.price}
+                    isAuth={props.isAuthenticated} />
+
             </Aux>
-        );
+        )
+        orderSummary = <OrderSummary
+            ingredients={props.ings}
+            purchaseContinue={purchaseContinueHandler}
+            purchaseCancel={purchaseCancelHandler}
+            price={props.price} />
     }
+
+    return (
+        <Aux>
+            <Modal
+                show={purchasing}
+                modalClosed={purchaseCancelHandler}>
+                {orderSummary}
+            </Modal>
+            {bugger}
+        </Aux>
+    );
+
 }
 
-const mapStateToProps = (state) =>{
+const mapStateToProps = (state) => {
     return {
-        ings : state.buggerBuilder.ingredients,
-        price : state.buggerBuilder.totalPrice,
-        error : state.error
+        ings: state.buggerBuilder.ingredients,
+        price: state.buggerBuilder.totalPrice,
+        error: state.error,
+        isAuthenticated: state.auth.token !== null
     }
 }
 
-const mapDispathToProps = (dispatch) =>{
+const mapDispathToProps = (dispatch) => {
     return {
-        onIngredientAdded : (ingName) => dispatch(actions.addIngredient(ingName)),
-        onIngredientRemoved : (ingName) => dispatch(actions.removeIngredient(ingName)),
-        onInitIngredient : () => dispatch(actions.initIngredient()),
-        onInitPurchase : () => dispatch(actions.purchaseInit())
+        onIngredientAdded: (ingName) => dispatch(actions.addIngredient(ingName)),
+        onIngredientRemoved: (ingName) => dispatch(actions.removeIngredient(ingName)),
+        onInitIngredient: () => dispatch(actions.initIngredient()),
+        onInitPurchase: () => dispatch(actions.purchaseInit()),
+        onSetRedirectPath: (path) => dispatch(actions.setAuthRedirectPath(path))
     }
 }
 
-export default connect(mapStateToProps,mapDispathToProps)(withErrorHandler(BuggerBuilder,axios))
+export default connect(mapStateToProps, mapDispathToProps)(withErrorHandler(buggerBuilder, axios))
